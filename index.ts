@@ -12,6 +12,7 @@ if (!OPENROUTER_API_KEY) {
 
 const DEFAULT_MODEL = "minimax/minimax-m2.5";
 const DEFAULT_MAX_ROUNDS = 20;
+const DEFAULT_TEMPERATURE = 1.0;
 const MAX_RETRIES = 3;
 const RESULTS_DIR = "./results";
 
@@ -21,6 +22,7 @@ interface GameConfig {
   modelA: string;
   modelB: string;
   maxRounds: number;
+  temperature: number;
   wordA: string;
   wordB: string;
 }
@@ -38,6 +40,7 @@ interface GameResult {
     modelA: string;
     modelB: string;
     maxRounds: number;
+    temperature: number;
     startingWords: [string, string];
   };
   rounds: Round[];
@@ -51,7 +54,8 @@ interface GameResult {
 
 async function chat(
   model: string,
-  messages: { role: "system" | "user"; content: string }[]
+  messages: { role: "system" | "user"; content: string }[],
+  temperature: number = DEFAULT_TEMPERATURE
 ): Promise<string> {
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -63,7 +67,7 @@ async function chat(
       body: JSON.stringify({
         model,
         messages,
-        temperature: 1.0,
+        temperature,
         max_tokens: 2048,
       }),
     });
@@ -148,6 +152,7 @@ async function playGame(config: GameConfig): Promise<GameResult> {
     console.log(`   Model B: ${config.modelB}`);
   }
   console.log(`   Starting words: ${config.wordA} ↔ ${config.wordB}`);
+  console.log(`   Temperature: ${config.temperature}`);
   console.log(`   Max rounds: ${config.maxRounds}`);
   console.log("─".repeat(50));
 
@@ -187,11 +192,11 @@ Rules:
       chat(config.modelA, [
         { role: "system", content: convergeSystem },
         { role: "user", content: promptA },
-      ]),
+      ], config.temperature),
       chat(config.modelB, [
         { role: "system", content: convergeSystem },
         { role: "user", content: promptB },
-      ]),
+      ], config.temperature),
     ]);
 
     const wordA = extractWord(rawA);
@@ -224,6 +229,7 @@ function buildResult(
       modelA: config.modelA,
       modelB: config.modelB,
       maxRounds: config.maxRounds,
+      temperature: config.temperature,
       startingWords: [config.wordA, config.wordB],
     },
     rounds,
@@ -291,6 +297,7 @@ function parseArgs(): GameConfig {
   let modelA: string | undefined;
   let modelB: string | undefined;
   let maxRounds = DEFAULT_MAX_ROUNDS;
+  let temperature = DEFAULT_TEMPERATURE;
   let wordA: string | undefined;
   let wordB: string | undefined;
 
@@ -303,6 +310,8 @@ function parseArgs(): GameConfig {
       modelB = args[++i];
     } else if (args[i] === "--max-rounds" && args[i + 1]) {
       maxRounds = parseInt(args[++i], 10);
+    } else if (args[i] === "--temperature" && args[i + 1]) {
+      temperature = parseFloat(args[++i]);
     } else if (args[i] === "--word-a" && args[i + 1]) {
       wordA = args[++i].toLowerCase();
     } else if (args[i] === "--word-b" && args[i + 1]) {
@@ -318,6 +327,7 @@ Options:
   --word-a <word>        Starting word for Player A (default: random from dictionary)
   --word-b <word>        Starting word for Player B (default: random from dictionary)
   --max-rounds <n>       Maximum rounds before giving up (default: ${DEFAULT_MAX_ROUNDS})
+  --temperature <n>      Sampling temperature 0.0-2.0 (default: ${DEFAULT_TEMPERATURE})
   --help, -h             Show this help
 
 Examples:
@@ -340,6 +350,7 @@ Examples:
     modelA: resolvedModelA,
     modelB: resolvedModelB,
     maxRounds,
+    temperature,
     wordA: resolvedWordA,
     wordB: resolvedWordB,
   };
