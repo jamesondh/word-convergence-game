@@ -6,7 +6,7 @@
 // For each anchor pair, runs 5 reps in both directions (A↔B and B↔A) across
 // 4 models (the distinctive ones) plus cross-model matchups.
 //
-// Metrics computed by analyze-round4.ts:
+// Metrics computed by analysis/analyze-round4.ts:
 //   1. Attractor strength — % runs landing on same convergence word/cluster
 //   2. Symmetry score — how much A↔B matches B↔A
 //   3. Novelty rate — % cross-model convergences not seen in solo runs

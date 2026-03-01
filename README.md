@@ -109,9 +109,20 @@ bun run batch/batch-round1.ts   # Easy pairs (concrete nouns) × 7 models
 bun run batch/batch-round2.ts   # Hard pairs (abstract/rare) × 6 models
 bun run batch/batch-round3.ts   # People × concepts + cross-model matchups
 bun run batch/batch-round4.ts   # Stability & symmetry (5 reps × 4 pairs × both directions)
+bun run batch/batch-round5.ts   # Temperature variations & direction effects
 ```
 
 Findings from each round are in `findings/`.
+
+## Analysis
+
+Analysis scripts live in `analysis/`:
+
+```bash
+bun run analysis/analyze.ts           # General result analysis
+bun run analysis/analyze-round4.ts    # Stability & symmetry metrics
+bun run analysis/analyze-round5.ts    # Temperature, prediction & direction
+```
 
 ## How it works
 
