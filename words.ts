@@ -105,4 +105,39 @@ export const WORDS: string[] = [
   "asylum", "monastery", "observatory", "workshop", "garden",
   "frontier", "crossroad", "oasis", "summit", "abyss",
   "threshold", "crucible", "sanctuary", "exodus",
+
+  // --- HARD MODE ---
+  // Abstract / philosophical
+  "nostalgia", "paradox", "sovereignty", "dogma", "heresy",
+  "catharsis", "hubris", "nemesis", "diaspora", "hegemony",
+  "entropy", "liminal", "dialectic", "simulacrum", "allegory",
+  "axiom", "tautology", "apocrypha", "schism", "zeitgeist",
+  "gestalt", "sublimation", "atavism", "apotheosis", "anathema",
+
+  // Rare / literary
+  "palimpsest", "penumbra", "patina", "effigy", "reliquary",
+  "cenotaph", "ossuary", "catafalque", "filigree", "tracery",
+  "chiaroscuro", "sfumato", "tessellation", "arabesque", "grotesque",
+  "bas-relief", "cartouche", "obelisk", "ziggurat", "minaret",
+
+  // Scientific / technical (evocative)
+  "quorum", "catalyst", "isotope", "parallax", "perihelion",
+  "aphelion", "accretion", "ablation", "diffraction", "refraction",
+  "osmosis", "mitosis", "synapse", "dendrite", "mycelium",
+  "fermentation", "calcification", "petrification", "fossilization", "sedimentation",
+
+  // Emotion / sensation (abstract)
+  "vertigo", "euphoria", "melancholy", "ennui", "reverie",
+  "languor", "torpor", "rapture", "dread", "longing",
+  "disquiet", "serenity", "desolation", "exhilaration", "wistfulness",
+
+  // Cultural / ritual
+  "liturgy", "requiem", "dirge", "libation", "ablution",
+  "pilgrimage", "penance", "tithe", "sacrilege", "consecration",
+  "excommunication", "martyrdom", "canonization", "benediction", "invocation",
+
+  // Geometric / structural (abstract)
+  "helix", "vortex", "fractal", "lattice", "matrix",
+  "nexus", "fulcrum", "vertex", "tangent", "asymptote",
+  "parabola", "hyperbola", "manifold", "topology", "tessera",
 ];
