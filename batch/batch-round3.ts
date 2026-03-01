@@ -69,6 +69,7 @@ for (const [wordA, wordB] of PEOPLE_CONCEPT_PAIRS) {
       const output = execSync(
         `bun run index.ts --model "${model}" --word-a "${wordA}" --word-b "${wordB}"`,
         {
+          cwd: `${import.meta.dir}/..`,
           encoding: "utf-8",
           timeout: 300_000,
           env: { ...process.env, PATH: `/home/jameson/.bun/bin:${process.env.PATH}` },
@@ -102,6 +103,7 @@ for (const { modelA, modelB, wordA, wordB } of CROSS_MODEL_GAMES) {
     const output = execSync(
       `bun run index.ts --model-a "${modelA}" --model-b "${modelB}" --word-a "${wordA}" --word-b "${wordB}"`,
       {
+        cwd: `${import.meta.dir}/..`,
         encoding: "utf-8",
         timeout: 300_000,
         env: { ...process.env, PATH: `/home/jameson/.bun/bin:${process.env.PATH}` },

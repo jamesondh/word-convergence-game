@@ -1,14 +1,14 @@
 #!/usr/bin/env bun
 
-// Batch runner: hard word pairs across 6 models (kimi excluded — too slow/unreliable).
-// Tests whether "instant convergence" models (Claude, Gemini) maintain their speed
-// on abstract/cross-domain pairs, or get forced into longer paths like GPT/Grok.
+// Batch runner: runs the same word pairs across multiple models sequentially.
+// Usage: bun run batch/batch-round1.ts
 
 import { execSync } from "child_process";
 
 const MODELS = [
   "minimax/minimax-m2.5",
   "z-ai/glm-5",
+  "moonshotai/kimi-k2.5",
   "google/gemini-3-flash-preview",
   "x-ai/grok-4.1-fast",
   "anthropic/claude-sonnet-4.6",
@@ -16,18 +16,18 @@ const MODELS = [
 ];
 
 const WORD_PAIRS: [string, string][] = [
-  ["palimpsest", "thunder"],    // layered erasure vs raw force
-  ["nostalgia", "isotope"],     // temporal emotion vs nuclear physics
-  ["liturgy", "erosion"],       // ritual vs geological process
-  ["vertigo", "mycelium"],      // sensation vs biology
-  ["paradox", "amber"],         // logical concept vs ancient material
+  ["mountain", "ocean"],     // nature vs nature, big conceptual gap
+  ["shadow", "melody"],      // abstract/sensory, cross-domain
+  ["hammer", "butterfly"],   // tool vs animal, hard vs soft
+  ["volcano", "clock"],      // nature vs human artifact
+  ["skull", "garden"],       // death vs life
 ];
 
 const total = MODELS.length * WORD_PAIRS.length;
 let completed = 0;
 let failures: string[] = [];
 
-console.log(`\n🧪 Hard batch: ${MODELS.length} models × ${WORD_PAIRS.length} word pairs = ${total} games\n`);
+console.log(`\n🧪 Batch run: ${MODELS.length} models × ${WORD_PAIRS.length} word pairs = ${total} games\n`);
 
 for (const [wordA, wordB] of WORD_PAIRS) {
   for (const model of MODELS) {
@@ -41,8 +41,9 @@ for (const [wordA, wordB] of WORD_PAIRS) {
       const output = execSync(
         `bun run index.ts --model "${model}" --word-a "${wordA}" --word-b "${wordB}"`,
         {
+          cwd: `${import.meta.dir}/..`,
           encoding: "utf-8",
-          timeout: 300_000, // 5 min per game (harder pairs may take longer)
+          timeout: 180_000, // 3 min per game
           env: { ...process.env, PATH: `/home/jameson/.bun/bin:${process.env.PATH}` },
         }
       );
@@ -57,7 +58,7 @@ for (const [wordA, wordB] of WORD_PAIRS) {
 }
 
 console.log(`\n${"═".repeat(60)}`);
-console.log(`🏁 Hard batch complete: ${completed - failures.length}/${total} succeeded`);
+console.log(`🏁 Batch complete: ${completed - failures.length}/${total} succeeded`);
 if (failures.length > 0) {
   console.log(`\n❌ Failures:`);
   failures.forEach((f) => console.log(`  - ${f}`));

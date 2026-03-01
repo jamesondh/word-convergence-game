@@ -100,6 +100,19 @@ This makes it easy to compare convergence behavior across models, analyze paths,
   💾 Saved to results/2026-03-01T17-30-00-minimax_minimax-m2.5-canyon-lighthouse.json
 ```
 
+## Batch experiments
+
+Batch runners for each experimental round live in `batch/`:
+
+```bash
+bun run batch/batch-round1.ts   # Easy pairs (concrete nouns) × 7 models
+bun run batch/batch-round2.ts   # Hard pairs (abstract/rare) × 6 models
+bun run batch/batch-round3.ts   # People × concepts + cross-model matchups
+bun run batch/batch-round4.ts   # Stability & symmetry (5 reps × 4 pairs × both directions)
+```
+
+Findings from each round are in `findings/`.
+
 ## How it works
 
 - Starting words come from a **built-in dictionary** of ~400 nouns — removes model word-selection bias as a variable
