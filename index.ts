@@ -1,5 +1,9 @@
 #!/usr/bin/env bun
 
+import { WORDS } from "./words";
+import { mkdir, writeFile } from "fs/promises";
+import { existsSync } from "fs";
+
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 if (!OPENROUTER_API_KEY) {
   console.error("Missing OPENROUTER_API_KEY in environment or .env file");
@@ -9,10 +13,16 @@ if (!OPENROUTER_API_KEY) {
 const DEFAULT_MODEL = "minimax/minimax-m2.5";
 const DEFAULT_MAX_ROUNDS = 20;
 const MAX_RETRIES = 3;
+const RESULTS_DIR = "./results";
+
+// --- Types ---
 
 interface GameConfig {
-  model: string;
+  modelA: string;
+  modelB: string;
   maxRounds: number;
+  wordA: string;
+  wordB: string;
 }
 
 interface Round {
@@ -21,6 +31,23 @@ interface Round {
   wordB: string;
   converged: boolean;
 }
+
+interface GameResult {
+  timestamp: string;
+  config: {
+    modelA: string;
+    modelB: string;
+    maxRounds: number;
+    startingWords: [string, string];
+  };
+  rounds: Round[];
+  converged: boolean;
+  totalRounds: number;
+  convergedWord: string | null;
+  uniqueWords: string[];
+}
+
+// --- API ---
 
 async function chat(
   model: string,
@@ -61,8 +88,9 @@ async function chat(
   throw new Error("Empty response from model after retries");
 }
 
+// --- Word processing ---
+
 function singularize(word: string): string {
-  // Very basic — just handles common plural forms to avoid near-miss frustration
   if (word.endsWith("ies") && word.length > 4)
     return word.slice(0, -3) + "y";
   if (word.endsWith("ses") || word.endsWith("xes") || word.endsWith("zes"))
@@ -98,46 +126,44 @@ function extractWord(response: string): string {
   );
 }
 
-async function playGame(config: GameConfig): Promise<{
-  rounds: Round[];
-  converged: boolean;
-  totalRounds: number;
-}> {
+function pickRandomWord(exclude?: string): string {
+  let word: string;
+  do {
+    word = WORDS[Math.floor(Math.random() * WORDS.length)];
+  } while (word === exclude);
+  return word;
+}
+
+// --- Game ---
+
+async function playGame(config: GameConfig): Promise<GameResult> {
   const rounds: Round[] = [];
+  const sameModel = config.modelA === config.modelB;
 
   console.log("\n🎮 Starting Convergence Game");
-  console.log(`   Model: ${config.model}`);
+  if (sameModel) {
+    console.log(`   Model: ${config.modelA}`);
+  } else {
+    console.log(`   Model A: ${config.modelA}`);
+    console.log(`   Model B: ${config.modelB}`);
+  }
+  console.log(`   Starting words: ${config.wordA} ↔ ${config.wordB}`);
   console.log(`   Max rounds: ${config.maxRounds}`);
-  console.log("─".repeat(44));
+  console.log("─".repeat(50));
 
-  // Round 1: both pick a random word (stateless, no history needed)
-  const initSystem = `You are playing a word game. Say a single random word. Pick something unexpected — not a typical or cliché choice. Just the word itself, nothing else. No explanation, no quotes, no punctuation.`;
-
-  const [rawA, rawB] = await Promise.all([
-    chat(config.model, [
-      { role: "system", content: initSystem },
-      { role: "user", content: "Say one random word." },
-    ]),
-    chat(config.model, [
-      { role: "system", content: initSystem },
-      { role: "user", content: "Say one random word." },
-    ]),
-  ]);
-
-  const wordA = extractWord(rawA);
-  const wordB = extractWord(rawB);
-  const converged = wordA === wordB;
-  rounds.push({ number: 1, wordA, wordB, converged });
+  // Round 1: dictionary words (no LLM call needed)
+  const convergedR1 = config.wordA === config.wordB;
+  rounds.push({ number: 1, wordA: config.wordA, wordB: config.wordB, converged: convergedR1 });
 
   console.log(
-    `\n  Round  1:  ${wordA}  ↔  ${wordB}${converged ? "  ✅" : ""}`
+    `\n  Round  1:  ${config.wordA}  ↔  ${config.wordB}${convergedR1 ? "  ✅" : ""}`
   );
 
-  if (converged) {
-    return { rounds, converged: true, totalRounds: 1 };
+  if (convergedR1) {
+    return buildResult(config, rounds, true, 1);
   }
 
-  // Convergence rounds — each call is stateless, all context in the prompt
+  // Convergence rounds
   const convergeSystem = `You are playing Convergence. Two players each say a word. The goal: say the SAME word as the other player.
 
 Rules:
@@ -158,11 +184,11 @@ Rules:
     const promptB = `Game history:\n${roundHistory}\n\nYou are Player B. The most recent words were "${lastRound.wordA}" and "${lastRound.wordB}".\nAlready used words (do NOT repeat): ${allUsedWords.join(", ")}\n\nSay one word that bridges these two concepts. Just the word.`;
 
     const [rawA, rawB] = await Promise.all([
-      chat(config.model, [
+      chat(config.modelA, [
         { role: "system", content: convergeSystem },
         { role: "user", content: promptA },
       ]),
-      chat(config.model, [
+      chat(config.modelB, [
         { role: "system", content: convergeSystem },
         { role: "user", content: promptB },
       ]),
@@ -178,26 +204,46 @@ Rules:
     );
 
     if (converged) {
-      return { rounds, converged: true, totalRounds: round };
+      return buildResult(config, rounds, true, round);
     }
   }
 
-  return { rounds, converged: false, totalRounds: config.maxRounds };
+  return buildResult(config, rounds, false, config.maxRounds);
 }
 
-function printSummary(result: {
-  rounds: Round[];
-  converged: boolean;
-  totalRounds: number;
-}) {
-  console.log("\n" + "─".repeat(44));
+function buildResult(
+  config: GameConfig,
+  rounds: Round[],
+  converged: boolean,
+  totalRounds: number
+): GameResult {
+  const allWords = [...new Set(rounds.flatMap((r) => [r.wordA, r.wordB]))];
+  return {
+    timestamp: new Date().toISOString(),
+    config: {
+      modelA: config.modelA,
+      modelB: config.modelB,
+      maxRounds: config.maxRounds,
+      startingWords: [config.wordA, config.wordB],
+    },
+    rounds,
+    converged,
+    totalRounds,
+    convergedWord: converged ? rounds[rounds.length - 1].wordA : null,
+    uniqueWords: allWords,
+  };
+}
+
+// --- Output ---
+
+function printSummary(result: GameResult) {
+  console.log("\n" + "─".repeat(50));
   console.log("📊 Game Summary");
-  console.log("─".repeat(44));
+  console.log("─".repeat(50));
 
   if (result.converged) {
-    const finalWord = result.rounds[result.rounds.length - 1].wordA;
     console.log(
-      `\n  ✅ Converged on "${finalWord}" in ${result.totalRounds} round${result.totalRounds === 1 ? "" : "s"}`
+      `\n  ✅ Converged on "${result.convergedWord}" in ${result.totalRounds} round${result.totalRounds === 1 ? "" : "s"}`
     );
   } else {
     console.log(
@@ -213,44 +259,95 @@ function printSummary(result: {
     );
   }
 
-  const allWords = new Set(result.rounds.flatMap((r) => [r.wordA, r.wordB]));
-  console.log(`\n  Unique words: ${allWords.size}`);
-  console.log(`  All words: ${[...allWords].join(", ")}`);
+  console.log(`\n  Unique words: ${result.uniqueWords.length}`);
+  console.log(`  All words: ${result.uniqueWords.join(", ")}`);
   console.log();
 }
 
+async function saveResult(result: GameResult): Promise<string> {
+  if (!existsSync(RESULTS_DIR)) {
+    await mkdir(RESULTS_DIR, { recursive: true });
+  }
+
+  // filename: timestamp-modelslug-wordA-wordB.json
+  const ts = result.timestamp.replace(/[:.]/g, "-").slice(0, 19);
+  const modelSlug = (result.config.modelA === result.config.modelB
+    ? result.config.modelA
+    : `${result.config.modelA}_vs_${result.config.modelB}`
+  ).replace(/[/\\:]/g, "_");
+  const filename = `${ts}-${modelSlug}-${result.config.startingWords[0]}-${result.config.startingWords[1]}.json`;
+  const filepath = `${RESULTS_DIR}/${filename}`;
+
+  await writeFile(filepath, JSON.stringify(result, null, 2) + "\n");
+  console.log(`  💾 Saved to ${filepath}`);
+  return filepath;
+}
+
 // --- CLI ---
+
 function parseArgs(): GameConfig {
   const args = process.argv.slice(2);
-  let model = DEFAULT_MODEL;
+  let model: string | undefined;
+  let modelA: string | undefined;
+  let modelB: string | undefined;
   let maxRounds = DEFAULT_MAX_ROUNDS;
+  let wordA: string | undefined;
+  let wordB: string | undefined;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--model" && args[i + 1]) {
       model = args[++i];
+    } else if (args[i] === "--model-a" && args[i + 1]) {
+      modelA = args[++i];
+    } else if (args[i] === "--model-b" && args[i + 1]) {
+      modelB = args[++i];
     } else if (args[i] === "--max-rounds" && args[i + 1]) {
       maxRounds = parseInt(args[++i], 10);
+    } else if (args[i] === "--word-a" && args[i + 1]) {
+      wordA = args[++i].toLowerCase();
+    } else if (args[i] === "--word-b" && args[i + 1]) {
+      wordB = args[++i].toLowerCase();
     } else if (args[i] === "--help" || args[i] === "-h") {
       console.log(`
 Usage: bun run index.ts [options]
 
 Options:
-  --model <model>        OpenRouter model ID (default: ${DEFAULT_MODEL})
+  --model <model>        OpenRouter model for both players (default: ${DEFAULT_MODEL})
+  --model-a <model>      Model for Player A (overrides --model)
+  --model-b <model>      Model for Player B (overrides --model)
+  --word-a <word>        Starting word for Player A (default: random from dictionary)
+  --word-b <word>        Starting word for Player B (default: random from dictionary)
   --max-rounds <n>       Maximum rounds before giving up (default: ${DEFAULT_MAX_ROUNDS})
   --help, -h             Show this help
 
 Examples:
   bun run index.ts
   bun run index.ts --model google/gemini-2.0-flash-001
+  bun run index.ts --model-a openai/gpt-4o --model-b anthropic/claude-3.5-sonnet
+  bun run index.ts --word-a mountain --word-b ocean
   bun run index.ts --max-rounds 30
 `);
       process.exit(0);
     }
   }
 
-  return { model, maxRounds };
+  const resolvedModelA = modelA || model || DEFAULT_MODEL;
+  const resolvedModelB = modelB || model || DEFAULT_MODEL;
+  const resolvedWordA = wordA || pickRandomWord();
+  const resolvedWordB = wordB || pickRandomWord(resolvedWordA);
+
+  return {
+    modelA: resolvedModelA,
+    modelB: resolvedModelB,
+    maxRounds,
+    wordA: resolvedWordA,
+    wordB: resolvedWordB,
+  };
 }
+
+// --- Main ---
 
 const config = parseArgs();
 const result = await playGame(config);
 printSummary(result);
+await saveResult(result);
