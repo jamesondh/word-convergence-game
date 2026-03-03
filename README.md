@@ -2,6 +2,8 @@
 
 Two LLMs play **Convergence** — the party game where two players try to say the same word by bridging their previous words each round.
 
+📝 **[Full writeup and findings →](https://jamesonhodge.com/posts/word-convergence-game)**
+
 Starting words are drawn from a [curated dictionary](./words.ts) of ~400 common nouns, so the experiment tests **interpolation ability**, not word selection.
 
 ## Setup
